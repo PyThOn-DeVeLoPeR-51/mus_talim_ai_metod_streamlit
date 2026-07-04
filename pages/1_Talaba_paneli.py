@@ -5,7 +5,7 @@ from datetime import datetime
 
 from utils.db import add_student, add_submission
 from utils.assessment import assess_student_answer
-
+from utils.file_analyzer import analyze_uploaded_file
 
 
 st.set_page_config(
@@ -166,8 +166,21 @@ if st.button("Topshiriqni yuborish"):
 
             file_path = str(saved_path)
 
+        file_analysis = None
+        extracted_text = None
+
+        if file_path:
+            file_result = analyze_uploaded_file(file_path)
+            file_analysis = file_result["file_analysis"]
+            extracted_text = file_result["extracted_text"]
+
+        combined_answer = answer
+
+        if extracted_text:
+            combined_answer = f"{answer}\n\nPDF fayldan ajratilgan matn:\n{extracted_text}"
+
         assessment_result = assess_student_answer(
-            answer_text=answer,
+            answer_text=combined_answer,
             subject=subject
         )
 
@@ -177,6 +190,8 @@ if st.button("Topshiriqni yuborish"):
             answer_text=answer,
             file_name=file_name,
             file_path=file_path,
+            file_analysis=file_analysis,
+            extracted_text=extracted_text,
             ai_score=assessment_result["score"],
             ai_feedback=assessment_result["feedback"],
             status=assessment_result["status"]
@@ -187,3 +202,6 @@ if st.button("Topshiriqni yuborish"):
         st.markdown("## 🤖 AI feedback")
         st.metric("AI ball", f"{assessment_result['score']}/100")
         st.info(assessment_result["feedback"])
+        if file_analysis:
+            st.markdown("## 📎 Fayl tahlili")
+            st.info(file_analysis)

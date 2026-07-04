@@ -69,6 +69,12 @@ def init_db():
     if not column_exists(cursor, "submissions", "file_path"):
         cursor.execute("ALTER TABLE submissions ADD COLUMN file_path TEXT")
 
+    if not column_exists(cursor, "submissions", "file_analysis"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN file_analysis TEXT")
+
+    if not column_exists(cursor, "submissions", "extracted_text"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN extracted_text TEXT")
+
     conn.commit()
     conn.close()
 
@@ -125,6 +131,8 @@ def add_submission(
     answer_text,
     file_name=None,
     file_path=None,
+    file_analysis=None,
+    extracted_text=None,
     ai_score=0,
     ai_feedback="AI feedback hali ulanmagan",
     status="Yuborilgan"
@@ -139,18 +147,22 @@ def add_submission(
             answer_text,
             file_name,
             file_path,
+            file_analysis,
+            extracted_text,
             ai_score,
             ai_feedback,
             status,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         student_id,
         task_title,
         answer_text,
         file_name,
         file_path,
+        file_analysis,
+        extracted_text,
         ai_score,
         ai_feedback,
         status,
@@ -214,6 +226,8 @@ def get_submissions():
             submissions.answer_text,
             submissions.file_name,
             submissions.file_path,
+            submissions.file_analysis,
+            submissions.extracted_text,
             submissions.ai_score,
             submissions.ai_feedback,
             submissions.status,

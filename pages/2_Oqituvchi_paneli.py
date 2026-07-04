@@ -130,6 +130,14 @@ if submissions:
     if selected_submission["file_path"]:
         st.code(selected_submission["file_path"])
 
+    if selected_submission["file_analysis"]:
+        with st.expander("📎 Fayl tahlilini ko‘rish"):
+            st.info(selected_submission["file_analysis"])
+
+    if selected_submission["extracted_text"]:
+        with st.expander("📄 PDFdan ajratilgan to‘liq matn"):
+            st.write(selected_submission["extracted_text"])
+
 else:
     st.warning("Hozircha topshiriq yuborilmagan.")
 
