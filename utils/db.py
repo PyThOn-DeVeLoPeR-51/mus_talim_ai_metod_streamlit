@@ -61,6 +61,14 @@ def init_db():
         )
     """)
 
+    def column_exists(cursor, table_name, column_name):
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = [row[1] for row in cursor.fetchall()]
+        return column_name in columns
+
+    if not column_exists(cursor, "submissions", "file_path"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN file_path TEXT")
+
     conn.commit()
     conn.close()
 
@@ -116,6 +124,7 @@ def add_submission(
     task_title,
     answer_text,
     file_name=None,
+    file_path=None,
     ai_score=0,
     ai_feedback="AI feedback hali ulanmagan",
     status="Yuborilgan"
@@ -129,17 +138,19 @@ def add_submission(
             task_title,
             answer_text,
             file_name,
+            file_path,
             ai_score,
             ai_feedback,
             status,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         student_id,
         task_title,
         answer_text,
         file_name,
+        file_path,
         ai_score,
         ai_feedback,
         status,
@@ -202,6 +213,7 @@ def get_submissions():
             submissions.task_title,
             submissions.answer_text,
             submissions.file_name,
+            submissions.file_path,
             submissions.ai_score,
             submissions.ai_feedback,
             submissions.status,

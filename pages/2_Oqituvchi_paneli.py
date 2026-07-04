@@ -126,6 +126,10 @@ if submissions:
 
     if selected_submission["file_name"]:
         st.caption(f"Yuklangan fayl: {selected_submission['file_name']}")
+
+    if selected_submission["file_path"]:
+        st.code(selected_submission["file_path"])
+
 else:
     st.warning("Hozircha topshiriq yuborilmagan.")
 

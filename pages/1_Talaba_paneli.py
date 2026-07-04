@@ -1,7 +1,12 @@
 import streamlit as st
 
+from pathlib import Path
+from datetime import datetime
+
 from utils.db import add_student, add_submission
 from utils.assessment import assess_student_answer
+
+
 
 st.set_page_config(
     page_title="Talaba paneli",
@@ -146,6 +151,20 @@ if st.button("Topshiriqni yuborish"):
         st.error("Avval javob yozing yoki fayl yuklang.")
     else:
         file_name = uploaded_file.name if uploaded_file else None
+        file_path = None
+
+        if uploaded_file is not None:
+            upload_dir = Path("uploads/submissions")
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_file_name = f"{timestamp}_{uploaded_file.name}"
+            saved_path = upload_dir / safe_file_name
+
+            with open(saved_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            file_path = str(saved_path)
 
         assessment_result = assess_student_answer(
             answer_text=answer,
@@ -157,6 +176,7 @@ if st.button("Topshiriqni yuborish"):
             task_title="1-mustaqil ta’lim topshirig‘i",
             answer_text=answer,
             file_name=file_name,
+            file_path=file_path,
             ai_score=assessment_result["score"],
             ai_feedback=assessment_result["feedback"],
             status=assessment_result["status"]
