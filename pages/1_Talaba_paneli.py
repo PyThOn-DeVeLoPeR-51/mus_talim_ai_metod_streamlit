@@ -169,12 +169,14 @@ if st.button("Topshiriqni yuborish"):
         file_analysis = None
         extracted_text = None
         drawing_overlay_path = None
+        drawing_score = None
 
         if file_path:
             file_result = analyze_uploaded_file(file_path)
             file_analysis = file_result.get("file_analysis")
             extracted_text = file_result.get("extracted_text")
             drawing_overlay_path = file_result.get("drawing_overlay_path")
+            drawing_score = file_result.get("drawing_score")
 
 
         combined_answer = answer
@@ -187,6 +189,39 @@ if st.button("Topshiriqni yuborish"):
             subject=subject
         )
 
+        text_score = assessment_result["score"]
+        final_score = text_score
+        final_feedback = assessment_result["feedback"]
+        final_status = assessment_result["status"]
+
+        if drawing_score is not None:
+            if answer.strip():
+                final_score = round((drawing_score * 0.7) + (text_score * 0.3))
+                final_feedback = (
+                    f"Umumiy AI ball: {final_score}/100.\n\n"
+                    f"Chizma sifati balli: {drawing_score}/100.\n"
+                    f"Matnli javob balli: {text_score}/100.\n\n"
+                    f"Ushbu baholashda chizma sifati 70%, matnli izoh 30% ulushda hisoblandi.\n\n"
+                    f"{assessment_result['feedback']}"
+                )
+            else:
+                final_score = drawing_score
+                final_feedback = (
+                    f"Umumiy AI ball: {final_score}/100.\n\n"
+                    f"Baholash asosan yuklangan chizma fayli sifati asosida shakllantirildi.\n"
+                    f"Chizma sifati balli: {drawing_score}/100.\n\n"
+                    f"Talaba qisqa izoh ham yozsa, keyingi versiyada baholash yanada aniqroq bo‘ladi."
+                )
+
+            if final_score >= 86:
+                final_status = "A’lo"
+            elif final_score >= 71:
+                final_status = "Yaxshi"
+            elif final_score >= 56:
+                final_status = "Qoniqarli"
+            else:
+                final_status = "Qayta ishlash kerak"
+
         add_submission(
             student_id=st.session_state["student_id"],
             task_title="1-mustaqil ta’lim topshirig‘i",
@@ -196,16 +231,22 @@ if st.button("Topshiriqni yuborish"):
             file_analysis=file_analysis,
             extracted_text=extracted_text,
             drawing_overlay_path=drawing_overlay_path,
-            ai_score=assessment_result["score"],
-            ai_feedback=assessment_result["feedback"],
-            status=assessment_result["status"]
+            drawing_score=drawing_score,
+            ai_score=final_score,
+            ai_feedback=final_feedback,
+            status=final_status
         )
 
         st.success("Topshiriq baholandi va SQLite bazaga saqlandi.")
 
         st.markdown("## 🤖 AI feedback")
-        st.metric("AI ball", f"{assessment_result['score']}/100")
-        st.info(assessment_result["feedback"])
+
+        st.metric("Umumiy AI ball", f"{final_score}/100")
+
+        if drawing_score is not None:
+            st.metric("Chizma sifati balli", f"{drawing_score}/100")
+
+        st.info(final_feedback)
 
         if file_analysis:
             st.markdown("## 📎 Fayl tahlili")

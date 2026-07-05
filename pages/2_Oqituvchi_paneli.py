@@ -95,6 +95,7 @@ if submissions:
             "Guruh": row["group_name"],
             "Topshiriq": row["task_title"],
             "Fayl": row["file_name"],
+            "Chizma ball": row["drawing_score"] if row["drawing_score"] is not None else "-",
             "AI ball": row["ai_score"],
             "Status": row["status"],
             "Vaqt": row["created_at"]

@@ -17,7 +17,8 @@ def analyze_drawing_image(image_path: str) -> dict:
     if not path.exists():
         return {
             "drawing_analysis": "Chizma fayli topilmadi.",
-            "drawing_overlay_path": None
+            "drawing_overlay_path": None,
+            "drawing_score": None
         }
 
     image = cv2.imread(str(path))
@@ -25,7 +26,8 @@ def analyze_drawing_image(image_path: str) -> dict:
     if image is None:
         return {
             "drawing_analysis": "Rasmni OpenCV orqali o‘qib bo‘lmadi.",
-            "drawing_overlay_path": None
+            "drawing_overlay_path": None,
+            "drawing_score": None
         }
 
     height, width = image.shape[:2]
@@ -75,6 +77,76 @@ def analyze_drawing_image(image_path: str) -> dict:
     ]
 
     contour_count = len(filtered_contours)
+
+    # Chizma sifati bo‘yicha boshlang‘ich ball hisoblash
+
+    # 1. Rasm o‘lchami — 15 ball
+    if width >= 1200 and height >= 800:
+        resolution_score = 15
+    elif width >= 800 and height >= 600:
+        resolution_score = 12
+    elif width >= 600 and height >= 400:
+        resolution_score = 8
+    else:
+        resolution_score = 4
+
+    # 2. Tiniqlik — 20 ball
+    if sharpness >= 250:
+        sharpness_score = 20
+    elif sharpness >= 120:
+        sharpness_score = 16
+    elif sharpness >= 80:
+        sharpness_score = 12
+    elif sharpness >= 40:
+        sharpness_score = 7
+    else:
+        sharpness_score = 3
+
+    # 3. Chizma zichligi — 20 ball
+    if 1 <= drawing_density <= 25:
+        density_score = 20
+    elif 0.5 <= drawing_density < 1:
+        density_score = 12
+    elif 25 < drawing_density <= 35:
+        density_score = 14
+    elif drawing_density < 0.5:
+        density_score = 5
+    else:
+        density_score = 8
+
+    # 4. Chiziqlar soni — 25 ball
+    if line_count >= 80:
+        line_score = 25
+    elif line_count >= 40:
+        line_score = 21
+    elif line_count >= 20:
+        line_score = 16
+    elif line_count >= 10:
+        line_score = 10
+    else:
+        line_score = 4
+
+    # 5. Konturlar soni — 20 ball
+    if contour_count >= 30:
+        contour_score = 20
+    elif contour_count >= 15:
+        contour_score = 16
+    elif contour_count >= 7:
+        contour_score = 11
+    elif contour_count >= 3:
+        contour_score = 7
+    else:
+        contour_score = 3
+
+    drawing_score = (
+            resolution_score
+            + sharpness_score
+            + density_score
+            + line_score
+            + contour_score
+    )
+
+    drawing_score = min(max(drawing_score, 0), 100)
 
     # Sifat bo‘yicha oddiy tavsiyalar
     recommendations = []
@@ -156,15 +228,23 @@ def analyze_drawing_image(image_path: str) -> dict:
 
     drawing_analysis = (
         f"OpenCV asosida chizma tahlili bajarildi.\n\n"
+        f"Boshlang‘ich chizma sifati balli: {drawing_score}/100\n\n"
         f"Rasm o‘lchami: {width} x {height} px\n"
         f"Chizma piksel zichligi: {drawing_density}%\n"
         f"Aniqlangan chiziqlar soni: {line_count}\n"
         f"Aniqlangan konturlar soni: {contour_count}\n"
         f"Rasm tiniqligi ko‘rsatkichi: {round(sharpness, 2)}\n\n"
+        f"Ball tarkibi:\n"
+        f"- Rasm o‘lchami: {resolution_score}/15\n"
+        f"- Tiniqlik: {sharpness_score}/20\n"
+        f"- Chizma zichligi: {density_score}/20\n"
+        f"- Chiziqlar soni: {line_score}/25\n"
+        f"- Konturlar soni: {contour_score}/20\n\n"
         f"Tavsiyalar:\n- " + "\n- ".join(recommendations)
     )
 
     return {
         "drawing_analysis": drawing_analysis,
-        "drawing_overlay_path": str(overlay_path)
+        "drawing_overlay_path": str(overlay_path),
+        "drawing_score": drawing_score
     }

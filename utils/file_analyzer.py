@@ -20,7 +20,8 @@ def analyze_uploaded_file(file_path: str) -> dict:
         return {
             "file_analysis": "Fayl topilmadi.",
             "extracted_text": "",
-            "drawing_overlay_path": None
+            "drawing_overlay_path": None,
+            "drawing_score": None
         }
 
     suffix = path.suffix.lower()
@@ -74,6 +75,7 @@ def render_first_pdf_page_to_image(path: Path) -> str | None:
 
 
 def analyze_pdf(path: Path) -> dict:
+    drawing_score = None
     extracted_text_parts = []
 
     try:
@@ -120,6 +122,8 @@ def analyze_pdf(path: Path) -> dict:
             )
 
             drawing_overlay_path = drawing_result["drawing_overlay_path"]
+            drawing_score = drawing_result.get("drawing_score")
+
         else:
             file_analysis += (
                 "\n\n"
@@ -130,8 +134,10 @@ def analyze_pdf(path: Path) -> dict:
         return {
             "file_analysis": file_analysis,
             "extracted_text": extracted_text,
-            "drawing_overlay_path": drawing_overlay_path
+            "drawing_overlay_path": drawing_overlay_path,
+            "drawing_score": drawing_score
         }
+
 
     except Exception as e:
         return {
@@ -162,7 +168,8 @@ def analyze_image(path: Path) -> dict:
         return {
             "file_analysis": file_analysis,
             "extracted_text": "",
-            "drawing_overlay_path": drawing_result["drawing_overlay_path"]
+            "drawing_overlay_path": drawing_result["drawing_overlay_path"],
+            "drawing_score": drawing_result["drawing_score"]
         }
 
     except Exception as e:
