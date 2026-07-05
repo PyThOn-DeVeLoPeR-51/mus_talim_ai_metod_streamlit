@@ -168,11 +168,14 @@ if st.button("Topshiriqni yuborish"):
 
         file_analysis = None
         extracted_text = None
+        drawing_overlay_path = None
 
         if file_path:
             file_result = analyze_uploaded_file(file_path)
-            file_analysis = file_result["file_analysis"]
-            extracted_text = file_result["extracted_text"]
+            file_analysis = file_result.get("file_analysis")
+            extracted_text = file_result.get("extracted_text")
+            drawing_overlay_path = file_result.get("drawing_overlay_path")
+
 
         combined_answer = answer
 
@@ -192,6 +195,7 @@ if st.button("Topshiriqni yuborish"):
             file_path=file_path,
             file_analysis=file_analysis,
             extracted_text=extracted_text,
+            drawing_overlay_path=drawing_overlay_path,
             ai_score=assessment_result["score"],
             ai_feedback=assessment_result["feedback"],
             status=assessment_result["status"]
@@ -202,6 +206,11 @@ if st.button("Topshiriqni yuborish"):
         st.markdown("## 🤖 AI feedback")
         st.metric("AI ball", f"{assessment_result['score']}/100")
         st.info(assessment_result["feedback"])
+
         if file_analysis:
             st.markdown("## 📎 Fayl tahlili")
             st.info(file_analysis)
+
+        if drawing_overlay_path:
+            st.markdown("## 🖼 OpenCV overlay")
+            st.image(drawing_overlay_path, caption="Aniqlangan chiziqlar va konturlar", use_container_width=True)

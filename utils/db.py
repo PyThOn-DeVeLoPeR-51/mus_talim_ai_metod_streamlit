@@ -75,6 +75,9 @@ def init_db():
     if not column_exists(cursor, "submissions", "extracted_text"):
         cursor.execute("ALTER TABLE submissions ADD COLUMN extracted_text TEXT")
 
+    if not column_exists(cursor, "submissions", "drawing_overlay_path"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN drawing_overlay_path TEXT")
+
     conn.commit()
     conn.close()
 
@@ -133,6 +136,7 @@ def add_submission(
     file_path=None,
     file_analysis=None,
     extracted_text=None,
+    drawing_overlay_path=None,
     ai_score=0,
     ai_feedback="AI feedback hali ulanmagan",
     status="Yuborilgan"
@@ -149,12 +153,13 @@ def add_submission(
             file_path,
             file_analysis,
             extracted_text,
+            drawing_overlay_path,
             ai_score,
             ai_feedback,
             status,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         student_id,
         task_title,
@@ -163,6 +168,7 @@ def add_submission(
         file_path,
         file_analysis,
         extracted_text,
+        drawing_overlay_path,
         ai_score,
         ai_feedback,
         status,
@@ -228,6 +234,7 @@ def get_submissions():
             submissions.file_path,
             submissions.file_analysis,
             submissions.extracted_text,
+            submissions.drawing_overlay_path,
             submissions.ai_score,
             submissions.ai_feedback,
             submissions.status,

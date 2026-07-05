@@ -138,6 +138,14 @@ if submissions:
         with st.expander("📄 PDFdan ajratilgan to‘liq matn"):
             st.write(selected_submission["extracted_text"])
 
+    if selected_submission["drawing_overlay_path"]:
+        with st.expander("🖼 OpenCV overlay natijasi"):
+            st.image(
+                selected_submission["drawing_overlay_path"],
+                caption="Aniqlangan chiziqlar va konturlar",
+                use_container_width=True
+            )
+
 else:
     st.warning("Hozircha topshiriq yuborilmagan.")
 

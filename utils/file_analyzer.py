@@ -1,14 +1,17 @@
 from pathlib import Path
+from datetime import datetime
 
 import fitz  # PyMuPDF
 from PIL import Image
+
+from utils.drawing_analyzer import analyze_drawing_image
 
 
 def analyze_uploaded_file(file_path: str) -> dict:
     """
     Yuklangan faylni tahlil qiladi.
-    PDF bo‘lsa matn ajratadi.
-    Rasm bo‘lsa format, o‘lcham va umumiy ma’lumot qaytaradi.
+    PDF bo‘lsa: matn ajratadi + birinchi sahifani rasmga aylantirib OpenCV tahlil qiladi.
+    Rasm bo‘lsa: format/o‘lcham + OpenCV chizma tahlili qiladi.
     """
 
     path = Path(file_path)
@@ -16,7 +19,8 @@ def analyze_uploaded_file(file_path: str) -> dict:
     if not path.exists():
         return {
             "file_analysis": "Fayl topilmadi.",
-            "extracted_text": ""
+            "extracted_text": "",
+            "drawing_overlay_path": None
         }
 
     suffix = path.suffix.lower()
@@ -29,8 +33,44 @@ def analyze_uploaded_file(file_path: str) -> dict:
 
     return {
         "file_analysis": f"{suffix} formatidagi fayl yuklangan. Hozircha bu format chuqur tahlil qilinmaydi.",
-        "extracted_text": ""
+        "extracted_text": "",
+        "drawing_overlay_path": None
     }
+
+
+def render_first_pdf_page_to_image(path: Path) -> str | None:
+    """
+    PDF birinchi sahifasini PNG rasmga aylantiradi.
+    Keyin shu rasm OpenCV tahlilga beriladi.
+    """
+
+    try:
+        output_dir = Path("outputs/pdf_pages")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = output_dir / f"{timestamp}_{path.stem}_page1.png"
+
+        doc = fitz.open(path)
+
+        if len(doc) == 0:
+            doc.close()
+            return None
+
+        page = doc[0]
+
+        # 2x zoom — chizma aniqroq chiqishi uchun
+        matrix = fitz.Matrix(2, 2)
+        pix = page.get_pixmap(matrix=matrix, alpha=False)
+
+        pix.save(str(output_path))
+
+        doc.close()
+
+        return str(output_path)
+
+    except Exception:
+        return None
 
 
 def analyze_pdf(path: Path) -> dict:
@@ -38,7 +78,6 @@ def analyze_pdf(path: Path) -> dict:
 
     try:
         doc = fitz.open(path)
-
         page_count = len(doc)
 
         for page in doc:
@@ -63,20 +102,42 @@ def analyze_pdf(path: Path) -> dict:
             file_analysis = (
                 f"PDF fayl tahlil qilindi.\n\n"
                 f"Sahifalar soni: {page_count}\n"
-                f"Lekin PDF ichidan matn ajratilmadi. "
-                f"Ehtimol, bu skaner qilingan PDF yoki rasm ko‘rinishidagi chizma. "
-                f"Keyingi bosqichda bunday fayllar uchun OCR/chizma tahlili qo‘shiladi."
+                f"PDF ichidan matn ajratilmadi. "
+                f"Ehtimol, bu skaner qilingan PDF yoki rasm ko‘rinishidagi chizma."
+            )
+
+        rendered_image_path = render_first_pdf_page_to_image(path)
+
+        drawing_overlay_path = None
+
+        if rendered_image_path:
+            drawing_result = analyze_drawing_image(rendered_image_path)
+
+            file_analysis += (
+                "\n\n"
+                "PDF birinchi sahifasi rasmga aylantirildi va OpenCV orqali tahlil qilindi.\n\n"
+                + drawing_result["drawing_analysis"]
+            )
+
+            drawing_overlay_path = drawing_result["drawing_overlay_path"]
+        else:
+            file_analysis += (
+                "\n\n"
+                "PDF sahifasini rasmga aylantirib bo‘lmadi. "
+                "Shuning uchun OpenCV overlay yaratilmagan."
             )
 
         return {
             "file_analysis": file_analysis,
-            "extracted_text": extracted_text
+            "extracted_text": extracted_text,
+            "drawing_overlay_path": drawing_overlay_path
         }
 
     except Exception as e:
         return {
             "file_analysis": f"PDF tahlilida xatolik yuz berdi: {e}",
-            "extracted_text": ""
+            "extracted_text": "",
+            "drawing_overlay_path": None
         }
 
 
@@ -87,22 +148,26 @@ def analyze_image(path: Path) -> dict:
             image_format = img.format
             mode = img.mode
 
-        file_analysis = (
+        base_analysis = (
             f"Rasm fayl tahlil qilindi.\n\n"
             f"Format: {image_format}\n"
             f"O‘lchami: {width} x {height} px\n"
             f"Rang rejimi: {mode}\n\n"
-            f"Hozircha rasm ichidagi matn yoki chizma elementlari chuqur tahlil qilinmaydi. "
-            f"Keyingi bosqichda OpenCV/OCR orqali chiziqlar, matnlar va chizma elementlarini ajratish qo‘shiladi."
         )
+
+        drawing_result = analyze_drawing_image(str(path))
+
+        file_analysis = base_analysis + drawing_result["drawing_analysis"]
 
         return {
             "file_analysis": file_analysis,
-            "extracted_text": ""
+            "extracted_text": "",
+            "drawing_overlay_path": drawing_result["drawing_overlay_path"]
         }
 
     except Exception as e:
         return {
             "file_analysis": f"Rasm tahlilida xatolik yuz berdi: {e}",
-            "extracted_text": ""
+            "extracted_text": "",
+            "drawing_overlay_path": None
         }
