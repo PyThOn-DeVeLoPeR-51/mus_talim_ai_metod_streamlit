@@ -3,7 +3,7 @@ import streamlit as st
 from pathlib import Path
 from datetime import datetime
 
-from utils.db import add_student, add_submission
+from utils.db import add_student, add_submission, get_submissions_by_student
 from utils.assessment import assess_student_answer
 from utils.file_analyzer import analyze_uploaded_file
 
@@ -170,6 +170,8 @@ if st.button("Topshiriqni yuborish"):
         extracted_text = None
         drawing_overlay_path = None
         drawing_score = None
+        rubric_score = None
+        rubric_feedback = None
 
         if file_path:
             file_result = analyze_uploaded_file(file_path)
@@ -177,6 +179,8 @@ if st.button("Topshiriqni yuborish"):
             extracted_text = file_result.get("extracted_text")
             drawing_overlay_path = file_result.get("drawing_overlay_path")
             drawing_score = file_result.get("drawing_score")
+            rubric_score = file_result.get("rubric_score")
+            rubric_feedback = file_result.get("rubric_feedback")
 
 
         combined_answer = answer
@@ -194,23 +198,32 @@ if st.button("Topshiriqni yuborish"):
         final_feedback = assessment_result["feedback"]
         final_status = assessment_result["status"]
 
-        if drawing_score is not None:
+        main_drawing_score = rubric_score if rubric_score is not None else drawing_score
+        if main_drawing_score is not None:
             if answer.strip():
-                final_score = round((drawing_score * 0.7) + (text_score * 0.3))
+                final_score = round((main_drawing_score * 0.7) + (text_score * 0.3))
                 final_feedback = (
                     f"Umumiy AI ball: {final_score}/100.\n\n"
-                    f"Chizma sifati balli: {drawing_score}/100.\n"
+                    f"Rubrika asosidagi chizma balli: "
+                    f"{rubric_score if rubric_score is not None else '-'} /100.\n"
+                    f"Boshlang‘ich texnik chizma sifati balli: "
+                    f"{drawing_score if drawing_score is not None else '-'} /100.\n"
                     f"Matnli javob balli: {text_score}/100.\n\n"
-                    f"Ushbu baholashda chizma sifati 70%, matnli izoh 30% ulushda hisoblandi.\n\n"
+                    f"Yakuniy AI ball hisobida rubrika asosidagi chizma bahosi 70%, "
+                    f"matnli izoh 30% ulushda hisoblandi.\n\n"
                     f"{assessment_result['feedback']}"
                 )
             else:
                 final_score = drawing_score
+
                 final_feedback = (
                     f"Umumiy AI ball: {final_score}/100.\n\n"
-                    f"Baholash asosan yuklangan chizma fayli sifati asosida shakllantirildi.\n"
-                    f"Chizma sifati balli: {drawing_score}/100.\n\n"
-                    f"Talaba qisqa izoh ham yozsa, keyingi versiyada baholash yanada aniqroq bo‘ladi."
+                    f"Baholash asosan yuklangan chizma asosida shakllantirildi.\n"
+                    f"Rubrika asosidagi chizma balli: "
+                    f"{rubric_score if rubric_score is not None else '-'} /100.\n"
+                    f"Boshlang‘ich texnik chizma sifati balli: "
+                    f"{drawing_score if drawing_score is not None else '-'} /100.\n\n"
+                    f"Talaba qisqa izoh ham yozsa, baholash yanada to‘liqroq bo‘ladi."
                 )
 
             if final_score >= 86:
@@ -232,6 +245,8 @@ if st.button("Topshiriqni yuborish"):
             extracted_text=extracted_text,
             drawing_overlay_path=drawing_overlay_path,
             drawing_score=drawing_score,
+            rubric_score=rubric_score,
+            rubric_feedback=rubric_feedback,
             ai_score=final_score,
             ai_feedback=final_feedback,
             status=final_status
@@ -239,19 +254,93 @@ if st.button("Topshiriqni yuborish"):
 
         st.success("Topshiriq baholandi va SQLite bazaga saqlandi.")
 
-        st.markdown("## 🤖 AI feedback")
 
-        st.metric("Umumiy AI ball", f"{final_score}/100")
+st.divider()
 
-        if drawing_score is not None:
-            st.metric("Chizma sifati balli", f"{drawing_score}/100")
+st.markdown("## 📚 Mening topshiriqlarim va natijalarim")
 
-        st.info(final_feedback)
+if "student_id" not in st.session_state:
+    st.info("Natijalarni ko‘rish uchun avval talaba ma’lumotlarini kiriting va AI mustaqil ta’lim rejasini yarating.")
+else:
+    my_submissions = get_submissions_by_student(st.session_state["student_id"])
 
-        if file_analysis:
-            st.markdown("## 📎 Fayl tahlili")
-            st.info(file_analysis)
+    if not my_submissions:
+        st.warning("Siz hali topshiriq yubormagansiz.")
+    else:
+        result_table = [
+            {
+                "ID": row["id"],
+                "Topshiriq": row["task_title"],
+                "AI ball": row["ai_score"],
+                "Rubrika ball": row["rubric_score"] if row["rubric_score"] is not None else "-",
+                "Texnik chizma balli": row["drawing_score"] if row["drawing_score"] is not None else "-",
+                "Status": row["status"],
+                "Fayl": row["file_name"] if row["file_name"] else "-",
+                "Vaqt": row["created_at"],
+            }
+            for row in my_submissions
+        ]
 
-        if drawing_overlay_path:
-            st.markdown("## 🖼 OpenCV overlay")
-            st.image(drawing_overlay_path, caption="Aniqlangan chiziqlar va konturlar", use_container_width=True)
+        st.dataframe(result_table, use_container_width=True)
+
+        st.markdown("### 🔍 Batafsil natijani ko‘rish")
+
+        submission_options = {
+            f"{row['task_title']} | {row['created_at']} | AI ball: {row['ai_score']}": row
+            for row in my_submissions
+        }
+
+        selected_label = st.selectbox(
+            "Topshiriqni tanlang",
+            list(submission_options.keys()),
+            key="student_submission_select"
+        )
+
+        selected = submission_options[selected_label]
+
+        col_a, col_b, col_c = st.columns(3)
+
+        with col_a:
+            st.metric("Umumiy AI ball", f"{selected['ai_score']}/100")
+
+        with col_b:
+            if selected["rubric_score"] is not None:
+                st.metric("Rubrika ball", f"{selected['rubric_score']}/100")
+            else:
+                st.metric("Rubrika ball", "-")
+
+        with col_c:
+            if selected["drawing_score"] is not None:
+                st.metric("Texnik chizma balli", f"{selected['drawing_score']}/100")
+            else:
+                st.metric("Texnik chizma balli", "-")
+
+        st.markdown("### 🤖 AI feedback")
+        st.info(selected["ai_feedback"])
+
+        if selected["rubric_feedback"]:
+            with st.expander("📋 Rubrika bo‘yicha batafsil tahlil", expanded=True):
+                st.info(selected["rubric_feedback"])
+
+        if selected["file_analysis"]:
+            with st.expander("📎 Faylning texnik tahlili"):
+                st.info(selected["file_analysis"])
+
+        if selected["answer_text"]:
+            with st.expander("✍️ Mening yozgan javobim"):
+                st.write(selected["answer_text"])
+
+        if selected["extracted_text"]:
+            with st.expander("📄 PDFdan ajratilgan matn"):
+                st.write(selected["extracted_text"])
+
+        if selected["file_name"]:
+            st.caption(f"Yuklangan fayl: {selected['file_name']}")
+
+        if selected["drawing_overlay_path"]:
+            st.markdown("### 🖼 OpenCV overlay natijasi")
+            st.image(
+                selected["drawing_overlay_path"],
+                caption="Aniqlangan chiziqlar va konturlar",
+                use_container_width=True
+            )

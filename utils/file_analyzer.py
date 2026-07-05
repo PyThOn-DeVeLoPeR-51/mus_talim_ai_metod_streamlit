@@ -35,7 +35,9 @@ def analyze_uploaded_file(file_path: str) -> dict:
     return {
         "file_analysis": f"{suffix} formatidagi fayl yuklangan. Hozircha bu format chuqur tahlil qilinmaydi.",
         "extracted_text": "",
-        "drawing_overlay_path": None
+        "drawing_overlay_path": None,
+        "rubric_score": None,
+        "rubric_feedback": None,
     }
 
 
@@ -75,6 +77,9 @@ def render_first_pdf_page_to_image(path: Path) -> str | None:
 
 
 def analyze_pdf(path: Path) -> dict:
+    rubric_score = None
+    rubric_feedback = None
+
     drawing_score = None
     extracted_text_parts = []
 
@@ -114,6 +119,8 @@ def analyze_pdf(path: Path) -> dict:
 
         if rendered_image_path:
             drawing_result = analyze_drawing_image(rendered_image_path)
+            rubric_score = drawing_result.get("rubric_score")
+            rubric_feedback = drawing_result.get("rubric_feedback")
 
             file_analysis += (
                 "\n\n"
@@ -135,7 +142,9 @@ def analyze_pdf(path: Path) -> dict:
             "file_analysis": file_analysis,
             "extracted_text": extracted_text,
             "drawing_overlay_path": drawing_overlay_path,
-            "drawing_score": drawing_score
+            "drawing_score": drawing_score,
+            "rubric_score": rubric_score,
+            "rubric_feedback": rubric_feedback,
         }
 
 
@@ -143,7 +152,9 @@ def analyze_pdf(path: Path) -> dict:
         return {
             "file_analysis": f"PDF tahlilida xatolik yuz berdi: {e}",
             "extracted_text": "",
-            "drawing_overlay_path": None
+            "drawing_overlay_path": None,
+            "rubric_score": None,
+            "rubric_feedback": None,
         }
 
 
@@ -169,7 +180,9 @@ def analyze_image(path: Path) -> dict:
             "file_analysis": file_analysis,
             "extracted_text": "",
             "drawing_overlay_path": drawing_result["drawing_overlay_path"],
-            "drawing_score": drawing_result["drawing_score"]
+            "drawing_score": drawing_result["drawing_score"],
+            "rubric_score": drawing_result.get("rubric_score"),
+            "rubric_feedback": drawing_result.get("rubric_feedback"),
         }
 
     except Exception as e:

@@ -1,9 +1,10 @@
 from pathlib import Path
 from datetime import datetime
 
-
 import cv2
 import numpy as np
+
+from utils.rubric_drawing_assessment import assess_drawing_by_rubric
 
 
 def analyze_drawing_image(image_path: str) -> dict:
@@ -18,7 +19,9 @@ def analyze_drawing_image(image_path: str) -> dict:
         return {
             "drawing_analysis": "Chizma fayli topilmadi.",
             "drawing_overlay_path": None,
-            "drawing_score": None
+            "drawing_score": None,
+            "rubric_score": None,
+            "rubric_feedback": None,
         }
 
     image = cv2.imread(str(path))
@@ -27,7 +30,9 @@ def analyze_drawing_image(image_path: str) -> dict:
         return {
             "drawing_analysis": "Rasmni OpenCV orqali o‘qib bo‘lmadi.",
             "drawing_overlay_path": None,
-            "drawing_score": None
+            "drawing_score": None,
+            "rubric_score": None,
+            "rubric_feedback": None,
         }
 
     height, width = image.shape[:2]
@@ -61,6 +66,27 @@ def analyze_drawing_image(image_path: str) -> dict:
         minLineLength=40,
         maxLineGap=10
     )
+
+    horizontal_lines = 0
+    vertical_lines = 0
+    diagonal_lines = 0
+
+    if lines is not None:
+        for line in lines:
+            coords = np.array(line).flatten()
+
+            if len(coords) >= 4:
+                x1, y1, x2, y2 = coords[:4].astype(int)
+
+                dx = abs(x2 - x1)
+                dy = abs(y2 - y1)
+
+                if dy <= 5 and dx > 20:
+                    horizontal_lines += 1
+                elif dx <= 5 and dy > 20:
+                    vertical_lines += 1
+                else:
+                    diagonal_lines += 1
 
     line_count = 0 if lines is None else len(lines)
 
@@ -148,6 +174,22 @@ def analyze_drawing_image(image_path: str) -> dict:
 
     drawing_score = min(max(drawing_score, 0), 100)
 
+    metrics = {
+        "width": width,
+        "height": height,
+        "sharpness": sharpness,
+        "drawing_density": drawing_density,
+        "line_count": line_count,
+        "contour_count": contour_count,
+        "horizontal_lines": horizontal_lines,
+        "vertical_lines": vertical_lines,
+        "diagonal_lines": diagonal_lines,
+    }
+
+    rubric_result = assess_drawing_by_rubric(metrics)
+    rubric_score = rubric_result["rubric_score"]
+    rubric_feedback = rubric_result["rubric_feedback"]
+
     # Sifat bo‘yicha oddiy tavsiyalar
     recommendations = []
 
@@ -227,24 +269,30 @@ def analyze_drawing_image(image_path: str) -> dict:
     cv2.imwrite(str(overlay_path), overlay)
 
     drawing_analysis = (
-        f"OpenCV asosida chizma tahlili bajarildi.\n\n"
-        f"Boshlang‘ich chizma sifati balli: {drawing_score}/100\n\n"
-        f"Rasm o‘lchami: {width} x {height} px\n"
-        f"Chizma piksel zichligi: {drawing_density}%\n"
-        f"Aniqlangan chiziqlar soni: {line_count}\n"
-        f"Aniqlangan konturlar soni: {contour_count}\n"
-        f"Rasm tiniqligi ko‘rsatkichi: {round(sharpness, 2)}\n\n"
-        f"Ball tarkibi:\n"
-        f"- Rasm o‘lchami: {resolution_score}/15\n"
-        f"- Tiniqlik: {sharpness_score}/20\n"
-        f"- Chizma zichligi: {density_score}/20\n"
-        f"- Chiziqlar soni: {line_score}/25\n"
-        f"- Konturlar soni: {contour_score}/20\n\n"
-        f"Tavsiyalar:\n- " + "\n- ".join(recommendations)
+            f"OpenCV asosida chizma texnik tahlili bajarildi.\n\n"
+            f"Boshlang‘ich texnik chizma sifati balli: {drawing_score}/100\n\n"
+            f"Rasm o‘lchami: {width} x {height} px\n"
+            f"Chizma piksel zichligi: {drawing_density}%\n"
+            f"Aniqlangan chiziqlar soni: {line_count}\n"
+            f"Aniqlangan konturlar soni: {contour_count}\n"
+            f"Rasm tiniqligi ko‘rsatkichi: {round(sharpness, 2)}\n\n"
+            f"Chiziqlar yo‘nalishi:\n"
+            f"- Gorizontal chiziqlar: {horizontal_lines}\n"
+            f"- Vertikal chiziqlar: {vertical_lines}\n"
+            f"- Qiya chiziqlar: {diagonal_lines}\n\n"
+            f"Texnik ball tarkibi:\n"
+            f"- Rasm o‘lchami: {resolution_score}/15\n"
+            f"- Tiniqlik: {sharpness_score}/20\n"
+            f"- Chizma zichligi: {density_score}/20\n"
+            f"- Chiziqlar soni: {line_score}/25\n"
+            f"- Konturlar soni: {contour_score}/20\n\n"
+            f"Tavsiyalar:\n- " + "\n- ".join(recommendations)
     )
 
     return {
         "drawing_analysis": drawing_analysis,
         "drawing_overlay_path": str(overlay_path),
-        "drawing_score": drawing_score
+        "drawing_score": drawing_score,
+        "rubric_score": rubric_score,
+        "rubric_feedback": rubric_feedback
     }

@@ -81,6 +81,12 @@ def init_db():
     if not column_exists(cursor, "submissions", "drawing_score"):
         cursor.execute("ALTER TABLE submissions ADD COLUMN drawing_score INTEGER")
 
+    if not column_exists(cursor, "submissions", "rubric_score"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN rubric_score INTEGER")
+
+    if not column_exists(cursor, "submissions", "rubric_feedback"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN rubric_feedback TEXT")
+
     conn.commit()
     conn.close()
 
@@ -141,6 +147,8 @@ def add_submission(
     extracted_text=None,
     drawing_overlay_path=None,
     drawing_score=None,
+    rubric_score=None,
+    rubric_feedback=None,
     ai_score=0,
     ai_feedback="AI feedback hali ulanmagan",
     status="Yuborilgan"
@@ -159,12 +167,14 @@ def add_submission(
             extracted_text,
             drawing_overlay_path,
             drawing_score,
+            rubric_score,
+            rubric_feedback,
             ai_score,
             ai_feedback,
             status,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         student_id,
         task_title,
@@ -175,6 +185,8 @@ def add_submission(
         extracted_text,
         drawing_overlay_path,
         drawing_score,
+        rubric_score,
+        rubric_feedback,
         ai_score,
         ai_feedback,
         status,
@@ -242,6 +254,8 @@ def get_submissions():
             submissions.extracted_text,
             submissions.drawing_overlay_path,
             submissions.drawing_score,
+            submissions.rubric_score,
+            submissions.rubric_feedback,
             submissions.ai_score,
             submissions.ai_feedback,
             submissions.status,
@@ -265,6 +279,39 @@ def get_tasks():
         SELECT * FROM tasks
         ORDER BY created_at DESC
     """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return rows
+
+
+def get_submissions_by_student(student_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT 
+            id,
+            student_id,
+            task_title,
+            answer_text,
+            file_name,
+            file_path,
+            file_analysis,
+            extracted_text,
+            drawing_overlay_path,
+            drawing_score,
+            rubric_score,
+            rubric_feedback,
+            ai_score,
+            ai_feedback,
+            status,
+            created_at
+        FROM submissions
+        WHERE student_id = ?
+        ORDER BY created_at DESC
+    """, (student_id,))
 
     rows = cursor.fetchall()
     conn.close()

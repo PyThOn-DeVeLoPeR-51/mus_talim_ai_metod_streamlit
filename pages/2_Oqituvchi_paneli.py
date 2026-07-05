@@ -96,6 +96,7 @@ if submissions:
             "Topshiriq": row["task_title"],
             "Fayl": row["file_name"],
             "Chizma ball": row["drawing_score"] if row["drawing_score"] is not None else "-",
+            "Rubrika ball": row["rubric_score"] if row["rubric_score"] is not None else "-",
             "AI ball": row["ai_score"],
             "Status": row["status"],
             "Vaqt": row["created_at"]
@@ -146,6 +147,13 @@ if submissions:
                 caption="Aniqlangan chiziqlar va konturlar",
                 use_container_width=True
             )
+
+    if selected_submission["rubric_score"] is not None:
+        st.metric("Rubrika asosidagi chizma balli", f"{selected_submission['rubric_score']}/100")
+
+    if selected_submission["rubric_feedback"]:
+        with st.expander("📋 Rubrika bo‘yicha batafsil baholash"):
+            st.info(selected_submission["rubric_feedback"])
 
 else:
     st.warning("Hozircha topshiriq yuborilmagan.")
