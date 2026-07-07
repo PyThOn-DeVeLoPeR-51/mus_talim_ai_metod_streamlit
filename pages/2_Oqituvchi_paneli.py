@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-from utils.db import get_students, get_submissions, add_task
+from utils.db import get_students, get_submissions, add_task, get_student_progress
 
 st.set_page_config(
     page_title="O‘qituvchi paneli",
@@ -94,6 +95,7 @@ if submissions:
             "Talaba": row["full_name"],
             "Guruh": row["group_name"],
             "Topshiriq": row["task_title"],
+            "Urinish": f"{row['attempt_number']}-urinish",
             "Fayl": row["file_name"],
             "Chizma ball": row["drawing_score"] if row["drawing_score"] is not None else "-",
             "Rubrika ball": row["rubric_score"] if row["rubric_score"] is not None else "-",
@@ -110,7 +112,7 @@ if submissions:
     st.markdown("### 🤖 AI feedbackni batafsil ko‘rish")
 
     submission_options = {
-        f"{row['full_name']} | {row['task_title']} | {row['created_at']}": row
+        f"{row['full_name']} | {row['task_title']} | {row['attempt_number']}-urinish | {row['created_at']}": row
         for row in submissions
     }
 
@@ -120,6 +122,15 @@ if submissions:
     )
 
     selected_submission = submission_options[selected_submission_label]
+
+    st.metric("Urinish", f"{selected_submission['attempt_number']}-urinish")
+
+    st.markdown("### 📈 Talaba progressi")
+
+    progress_rows = get_student_progress(
+        student_id=selected_submission["student_id"] if "student_id" in selected_submission.keys() else None,
+        task_title=selected_submission["task_title"]
+    )
 
     st.info(selected_submission["ai_feedback"])
 
@@ -154,6 +165,57 @@ if submissions:
     if selected_submission["rubric_feedback"]:
         with st.expander("📋 Rubrika bo‘yicha batafsil baholash"):
             st.info(selected_submission["rubric_feedback"])
+
+    st.markdown("### 📈 Talaba progressi")
+
+    progress_rows = get_student_progress(
+        student_id=selected_submission["student_id"],
+        task_title=selected_submission["task_title"]
+    )
+
+    if len(progress_rows) < 2:
+        st.info("Bu talaba ushbu topshiriq bo‘yicha hali kamida 2 marta topshirmagan.")
+    else:
+        progress_data = [
+            {
+                "Urinish": row["attempt_number"],
+                "AI ball": row["ai_score"],
+                "Rubrika ball": row["rubric_score"] if row["rubric_score"] is not None else 0,
+                "Texnik chizma balli": row["drawing_score"] if row["drawing_score"] is not None else 0,
+                "Status": row["status"],
+                "Vaqt": row["created_at"],
+            }
+            for row in progress_rows
+        ]
+
+        progress_df = pd.DataFrame(progress_data)
+
+        st.dataframe(progress_df, use_container_width=True)
+
+        first_score = progress_df.iloc[0]["AI ball"]
+        last_score = progress_df.iloc[-1]["AI ball"]
+        growth = last_score - first_score
+
+        col_g1, col_g2, col_g3 = st.columns(3)
+
+        with col_g1:
+            st.metric("Birinchi urinish", f"{first_score}/100")
+
+        with col_g2:
+            st.metric("Oxirgi urinish", f"{last_score}/100")
+
+        with col_g3:
+            st.metric("O‘sish", f"{growth:+}/100")
+
+        fig_teacher_progress = px.line(
+            progress_df,
+            x="Urinish",
+            y="AI ball",
+            markers=True,
+            title="Talabaning urinishlar bo‘yicha progressi"
+        )
+
+        st.plotly_chart(fig_teacher_progress, use_container_width=True)
 
 else:
     st.warning("Hozircha topshiriq yuborilmagan.")

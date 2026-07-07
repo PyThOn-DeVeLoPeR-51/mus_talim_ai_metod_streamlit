@@ -87,6 +87,15 @@ def init_db():
     if not column_exists(cursor, "submissions", "rubric_feedback"):
         cursor.execute("ALTER TABLE submissions ADD COLUMN rubric_feedback TEXT")
 
+    if not column_exists(cursor, "submissions", "attempt_number"):
+        cursor.execute("ALTER TABLE submissions ADD COLUMN attempt_number INTEGER DEFAULT 1")
+
+    cursor.execute("""
+        UPDATE submissions
+        SET attempt_number = 1
+        WHERE attempt_number IS NULL
+    """)
+
     conn.commit()
     conn.close()
 
@@ -151,7 +160,8 @@ def add_submission(
     rubric_feedback=None,
     ai_score=0,
     ai_feedback="AI feedback hali ulanmagan",
-    status="Yuborilgan"
+    status="Yuborilgan",
+    attempt_number=1,
 ):
     conn = get_connection()
     cursor = conn.cursor()
@@ -172,9 +182,10 @@ def add_submission(
             ai_score,
             ai_feedback,
             status,
+            attempt_number,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         student_id,
         task_title,
@@ -190,6 +201,7 @@ def add_submission(
         ai_score,
         ai_feedback,
         status,
+        attempt_number,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ))
 
@@ -244,6 +256,7 @@ def get_submissions():
     cursor.execute("""
         SELECT 
             submissions.id,
+            submissions.student_id,
             students.full_name,
             students.group_name,
             submissions.task_title,
@@ -259,6 +272,7 @@ def get_submissions():
             submissions.ai_score,
             submissions.ai_feedback,
             submissions.status,
+            submissions.attempt_number,
             submissions.created_at
         FROM submissions
         LEFT JOIN students ON submissions.student_id = students.id
@@ -307,11 +321,54 @@ def get_submissions_by_student(student_id):
             ai_score,
             ai_feedback,
             status,
+            attempt_number,
             created_at
         FROM submissions
         WHERE student_id = ?
         ORDER BY created_at DESC
     """, (student_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return rows
+
+
+def get_next_attempt_number(student_id, task_title):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT MAX(attempt_number) AS max_attempt
+        FROM submissions
+        WHERE student_id = ? AND task_title = ?
+    """, (student_id, task_title))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    max_attempt = row["max_attempt"] if row and row["max_attempt"] is not None else 0
+
+    return max_attempt + 1
+
+def get_student_progress(student_id, task_title):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT 
+            id,
+            task_title,
+            attempt_number,
+            ai_score,
+            rubric_score,
+            drawing_score,
+            status,
+            created_at
+        FROM submissions
+        WHERE student_id = ? AND task_title = ?
+        ORDER BY attempt_number ASC
+    """, (student_id, task_title))
 
     rows = cursor.fetchall()
     conn.close()

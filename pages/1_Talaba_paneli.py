@@ -1,9 +1,18 @@
 import streamlit as st
 
+import pandas as pd
+import plotly.express as px
+
 from pathlib import Path
 from datetime import datetime
 
-from utils.db import add_student, add_submission, get_submissions_by_student
+from utils.db import (
+    add_student,
+    add_submission,
+    get_submissions_by_student,
+    get_next_attempt_number,
+    get_student_progress
+)
 from utils.assessment import assess_student_answer
 from utils.file_analyzer import analyze_uploaded_file
 
@@ -235,6 +244,13 @@ if st.button("Topshiriqni yuborish"):
             else:
                 final_status = "Qayta ishlash kerak"
 
+        task_title = "1-mustaqil ta’lim topshirig‘i"
+
+        attempt_number = get_next_attempt_number(
+            student_id=st.session_state["student_id"],
+            task_title=task_title
+        )
+
         add_submission(
             student_id=st.session_state["student_id"],
             task_title="1-mustaqil ta’lim topshirig‘i",
@@ -249,10 +265,11 @@ if st.button("Topshiriqni yuborish"):
             rubric_feedback=rubric_feedback,
             ai_score=final_score,
             ai_feedback=final_feedback,
-            status=final_status
+            status=final_status,
+            attempt_number=attempt_number
         )
 
-        st.success("Topshiriq baholandi va SQLite bazaga saqlandi.")
+        st.success(f"Topshiriq baholandi va SQLite bazaga saqlandi. Bu {attempt_number}-urinish.")
 
 
 st.divider()
@@ -271,6 +288,7 @@ else:
             {
                 "ID": row["id"],
                 "Topshiriq": row["task_title"],
+                "Urinish": f"{row['attempt_number']}-urinish",
                 "AI ball": row["ai_score"],
                 "Rubrika ball": row["rubric_score"] if row["rubric_score"] is not None else "-",
                 "Texnik chizma balli": row["drawing_score"] if row["drawing_score"] is not None else "-",
@@ -286,7 +304,7 @@ else:
         st.markdown("### 🔍 Batafsil natijani ko‘rish")
 
         submission_options = {
-            f"{row['task_title']} | {row['created_at']} | AI ball: {row['ai_score']}": row
+            f"{row['task_title']} | {row['attempt_number']}-urinish | AI ball: {row['ai_score']} | {row['created_at']}": row
             for row in my_submissions
         }
 
@@ -314,6 +332,8 @@ else:
                 st.metric("Texnik chizma balli", f"{selected['drawing_score']}/100")
             else:
                 st.metric("Texnik chizma balli", "-")
+
+        st.metric("Urinish", f"{selected['attempt_number']}-urinish")
 
         st.markdown("### 🤖 AI feedback")
         st.info(selected["ai_feedback"])
@@ -344,3 +364,77 @@ else:
                 caption="Aniqlangan chiziqlar va konturlar",
                 use_container_width=True
             )
+
+
+st.divider()
+
+st.markdown("## 📈 Mening progressim")
+
+if "student_id" not in st.session_state:
+    st.info("Progressni ko‘rish uchun avval talaba ma’lumotlarini kiriting.")
+else:
+    progress_rows = get_student_progress(
+        student_id=st.session_state["student_id"],
+        task_title="1-mustaqil ta’lim topshirig‘i"
+    )
+
+    if len(progress_rows) < 2:
+        st.info("Progressni ko‘rish uchun kamida 2 ta urinish kerak.")
+    else:
+        progress_data = [
+            {
+                "Urinish": row["attempt_number"],
+                "AI ball": row["ai_score"],
+                "Rubrika ball": row["rubric_score"] if row["rubric_score"] is not None else 0,
+                "Texnik chizma balli": row["drawing_score"] if row["drawing_score"] is not None else 0,
+                "Status": row["status"],
+                "Vaqt": row["created_at"],
+            }
+            for row in progress_rows
+        ]
+
+        progress_df = pd.DataFrame(progress_data)
+
+        st.dataframe(progress_df, use_container_width=True)
+
+        first_score = progress_df.iloc[0]["AI ball"]
+        last_score = progress_df.iloc[-1]["AI ball"]
+        growth = last_score - first_score
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+
+        with col_p1:
+            st.metric("Birinchi urinish", f"{first_score}/100")
+
+        with col_p2:
+            st.metric("Oxirgi urinish", f"{last_score}/100")
+
+        with col_p3:
+            st.metric("O‘sish", f"{growth:+}/100")
+
+        if growth > 0:
+            st.success(
+                f"Sizning natijangiz {growth} ballga yaxshilangan. "
+                f"Bu AI feedback asosida qayta ishlash ijobiy ta’sir qilganini ko‘rsatadi."
+            )
+        elif growth == 0:
+            st.warning(
+                "Natija o‘zgarmagan. Keyingi urinishda rubrika bo‘yicha tavsiyalarni aniqroq bajarish tavsiya etiladi."
+            )
+        else:
+            st.error(
+                f"Natija {abs(growth)} ballga pasaygan. "
+                f"Chizma sifati, rubrika mezonlari va matnli izohni qayta ko‘rib chiqish kerak."
+            )
+
+        st.markdown("### 📊 Urinishlar bo‘yicha o‘sish grafigi")
+
+        fig_progress = px.line(
+            progress_df,
+            x="Urinish",
+            y="AI ball",
+            markers=True,
+            title="AI ballning urinishlar bo‘yicha o‘zgarishi"
+        )
+
+        st.plotly_chart(fig_progress, use_container_width=True)
